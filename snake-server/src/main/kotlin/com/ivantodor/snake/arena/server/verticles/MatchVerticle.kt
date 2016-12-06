@@ -52,7 +52,7 @@ class MatchVerticle(val matchId: String, val clients: List<String>, matchConstra
     }
 
     private fun periodicUpdateAndReport() {
-        vertx.setPeriodic(400) {
+        vertx.setPeriodic(1000) {
             when (match.state) {
                 MatchState.ACTIVE -> {
                     val status = match.executeStep()
