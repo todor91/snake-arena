@@ -9,6 +9,7 @@ import com.ivantodor.snake.arena.client.websocket.WebsocketClient;
 import com.ivantodor.snake.arena.client.websocket.WebsocketClientException;
 import com.ivantodor.snake.arena.common.MoveAction;
 import com.ivantodor.snake.arena.common.model.Direction;
+import com.ivantodor.snake.arena.common.model.MatchConstraints;
 import com.ivantodor.snake.arena.common.request.MatchDiscoverRequest;
 import com.ivantodor.snake.arena.common.request.MatchInvitationRequest;
 import com.ivantodor.snake.arena.common.request.PlayerListRequest;
@@ -108,9 +109,9 @@ public class GameManager implements MessageHandler.Whole<String>
         websocketClient.sendMessage(convertToJson(new PlayerListRequest()));
     }
 
-    public void invitePlayers(List<String> invitedPlayers, int boardSize)
+    public void invitePlayers(List<String> invitedPlayers, MatchConstraints matchConstraints)
     {
-        MatchInvitationRequest request = new MatchInvitationRequest(boardSize, invitedPlayers);
+        MatchInvitationRequest request = new MatchInvitationRequest(invitedPlayers, matchConstraints);
         websocketClient.sendMessage(convertToJson(request));
     }
 

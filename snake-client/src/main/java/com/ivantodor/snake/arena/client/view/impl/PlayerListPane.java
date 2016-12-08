@@ -2,6 +2,8 @@ package com.ivantodor.snake.arena.client.view.impl;
 
 import com.ivantodor.snake.arena.client.controller.GameManager;
 import com.ivantodor.snake.arena.client.view.PlayerListView;
+import com.ivantodor.snake.arena.client.view.helper.InvitationDialog;
+import com.ivantodor.snake.arena.common.model.MatchConstraints;
 import com.ivantodor.snake.arena.common.request.MatchInvitationRequest;
 import com.ivantodor.snake.arena.common.response.MatchInvitationResponse;
 import javafx.collections.FXCollections;
@@ -11,7 +13,6 @@ import javafx.scene.control.*;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 
-import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Optional;
@@ -84,22 +85,12 @@ public class PlayerListPane extends VBox implements PlayerListView
     private void invitePlayers()
     {
         List<String> invited = new LinkedList<>();
-        for (String invitedPlayer : list.getSelectionModel().getSelectedItems())
-            invited.add(invitedPlayer);
+        invited.addAll(list.getSelectionModel().getSelectedItems());
 
-        List<String> choices = new ArrayList<>();
-        for (int i = 10; i < 31; i++)
-            choices.add(Integer.toString(i));
+        Dialog<MatchConstraints> dialog = InvitationDialog.create(invited);
 
-        ChoiceDialog<String> dialog = new ChoiceDialog<>("15", choices);
-        dialog.setTitle("Invitation");
-        dialog.setHeaderText("Match constraints");
-        dialog.setContentText("Choose board size:");
-
-        // Traditional way to get the response value.
-        Optional<String> result = dialog.showAndWait();
-        if (result.isPresent()){
-            GameManager.getInstance().invitePlayers(invited, Integer.parseInt(result.get()));
-        }
+        Optional<MatchConstraints> result = dialog.showAndWait();
+        if (result.isPresent())
+            GameManager.getInstance().invitePlayers(invited, result.get());
     }
 }

@@ -1,5 +1,6 @@
 package com.ivantodor.snake.arena.server.verticles
 
+import com.ivantodor.snake.arena.common.model.MatchConstraints
 import com.ivantodor.snake.arena.common.request.MatchInvitationRequest
 import io.vertx.core.AbstractVerticle
 import io.vertx.core.json.Json
@@ -27,7 +28,7 @@ class MatchOrganizerVerticle : AbstractVerticle() {
             val request = Json.decodeValue(msg.body().toString(), MatchInvitationRequest::class.java)
             val initiator = msg.headers()["clientId"]
 
-            val invitationStatus = InvitationStatus(initiator, mutableMapOf(), MatchConstraints(request.boardSize))
+            val invitationStatus = InvitationStatus(initiator, mutableMapOf(), request.matchConstraints)
             invitationStatus.responses.putAll(request.invitedPlayers.map { Pair(it, false) }.toMap())
 
             pendingInvitations.put(request.invitationId, invitationStatus)
@@ -58,7 +59,7 @@ class MatchOrganizerVerticle : AbstractVerticle() {
                 lists.add(pendingInvitations[invitationId]?.initiator ?: "123")
                 lists.addAll(pendingInvitations[invitationId]?.responses?.keys ?: listOf())
 
-                vertx.deployVerticle(MatchVerticle(invitationId, lists, pendingInvitations[invitationId]?.matchConstraints ?: MatchConstraints(10)))
+                vertx.deployVerticle(MatchVerticle(invitationId, lists, pendingInvitations[invitationId]?.matchConstraints ?: MatchConstraints()))
                 pendingInvitations.remove(invitationId)
             }
         }

@@ -1,6 +1,7 @@
 package com.ivantodor.snake.arena.server.verticles
 
 import com.ivantodor.snake.arena.common.MoveAction
+import com.ivantodor.snake.arena.common.model.MatchConstraints
 import com.ivantodor.snake.arena.common.model.MatchState
 import com.ivantodor.snake.arena.common.response.MatchDiscoverResponse
 import com.ivantodor.snake.arena.common.response.MatchStatusResponse
@@ -18,10 +19,7 @@ import mu.KLogging
 /**
  * @author Ivan Todorovic
  */
-
-data class MatchConstraints(val boardSize: Int)
-
-class MatchVerticle(val matchId: String, val clients: List<String>, matchConstraints: MatchConstraints) : AbstractVerticle() {
+class MatchVerticle(val matchId: String, val clients: List<String>, val matchConstraints: MatchConstraints) : AbstractVerticle() {
     companion object : KLogging()
 
     val board = MatrixBoard(matchConstraints.boardSize)
@@ -52,7 +50,7 @@ class MatchVerticle(val matchId: String, val clients: List<String>, matchConstra
     }
 
     private fun periodicUpdateAndReport() {
-        vertx.setPeriodic(1000) {
+        vertx.setPeriodic(matchConstraints.stepTimeout.toLong()) {
             when (match.state) {
                 MatchState.ACTIVE -> {
                     val status = match.executeStep()

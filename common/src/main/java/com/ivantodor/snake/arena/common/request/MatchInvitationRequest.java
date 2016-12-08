@@ -1,6 +1,7 @@
 package com.ivantodor.snake.arena.common.request;
 
 import com.ivantodor.snake.arena.common.Message;
+import com.ivantodor.snake.arena.common.model.MatchConstraints;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -14,18 +15,18 @@ public class MatchInvitationRequest extends Message
     public static final String TYPE = "matchInvitation";
 
     private String invitationId;
-    private int boardSize;
     private List<String> invitedPlayers = new ArrayList<String>();
+    private MatchConstraints matchConstraints;
 
     public MatchInvitationRequest()
     {
         super(TYPE);
     }
 
-    public MatchInvitationRequest(int boardSize, List<String> invitedPlayers)
+    public MatchInvitationRequest(List<String> invitedPlayers, MatchConstraints matchConstraints)
     {
         this();
-        this.boardSize = boardSize;
+        this.matchConstraints = matchConstraints;
         this.invitationId = UUID.randomUUID().toString();
         this.invitedPlayers = invitedPlayers;
     }
@@ -40,8 +41,8 @@ public class MatchInvitationRequest extends Message
         return invitationId;
     }
 
-    public int getBoardSize()
+    public MatchConstraints getMatchConstraints()
     {
-        return boardSize;
+        return matchConstraints;
     }
 }
