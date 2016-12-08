@@ -8,6 +8,7 @@ import io.vertx.core.AbstractVerticle
 import io.vertx.core.http.ServerWebSocket
 import io.vertx.core.json.Json
 import mu.KLogging
+import java.net.URLDecoder
 
 /**
  * @author Ivan Todorovic
@@ -36,22 +37,38 @@ class HttpVerticle(val port: Int) : AbstractVerticle() {
     }
 
     private fun setupClientEnvironment(websocket: ServerWebSocket) {
-        val nameMatching = clientNameRegex.find(websocket.path())
-        //todo checking
-        val name = nameMatching?.groups?.get(1)?.value ?: "null"
-
-        if (Globals.clientList.contains(name)) {
-            logger.debug("Name $name already taken")
-            val rejectionResponse = Json.encode(ServerRejectResponse("Name already taken"))
-            websocket.writeFinalTextFrame(rejectionResponse)
-            websocket.close()
-        } else {
+        withValidName(websocket) { name ->
             Globals.clientList.add(name)
             vertx.deployVerticle(ClientVerticle(name, websocket)) { deploymentResult ->
                 deploymentResult.onSuccess { logger.info("Client verticle '$name' deployed") }
                 deploymentResult.onFailure { logger.error("Client '$name' verticle deployment failed") }
             }
         }
+    }
+
+    private fun withValidName(websocket: ServerWebSocket, f: (String) -> Unit): Unit {
+        val nameMatching = clientNameRegex.find(websocket.path())
+        val rawName = nameMatching?.groups?.get(1)?.value
+
+        if (rawName == null) {
+            websocket.writeFinalTextFrame(Json.encode(ServerRejectResponse("Invalid name")))
+            websocket.close()
+            return
+        }
+
+        val decodedName = URLDecoder.decode(rawName, "UTF-8")
+
+        // Reject if name already exists
+        if(Globals.clientList.contains(decodedName)) {
+            logger.debug("Name $decodedName already taken")
+            val rejectionResponse = Json.encode(ServerRejectResponse("Name already taken"))
+            websocket.writeFinalTextFrame(rejectionResponse)
+            websocket.close()
+            return
+        }
+
+        // Perform action
+        f(decodedName)
     }
 }
 

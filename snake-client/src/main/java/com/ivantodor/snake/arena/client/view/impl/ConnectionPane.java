@@ -17,6 +17,7 @@ public class ConnectionPane extends HBox implements ConnectionView
 {
     public static final String DEFAULT_HOST = "ws://localhost:8080/snakearena/";
     public static final String DEFAULT_NAME = "TestName";
+    public static final int NAME_MAX_LENGTH = 15;
 
     private TextField hostField;
     private TextField nameField;
@@ -39,6 +40,12 @@ public class ConnectionPane extends HBox implements ConnectionView
         this.setAlignment(Pos.CENTER);
         setStyle("-fx-border-color: black");
 
+        // Limiting number of characters to NAME_MAX_LENGTH
+        nameField.lengthProperty().addListener((observable, oldValue, newValue) ->
+        {
+            String text = nameField.getText();
+            nameField.setText(text.substring(0, Math.min(text.length(), NAME_MAX_LENGTH)));
+        });
 
         connectDisconnectButton.setOnAction(e -> connectDisconnectAction());
     }

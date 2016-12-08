@@ -3,8 +3,8 @@ package com.ivantodor.snake.arena.client.controller;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.ivantodor.snake.arena.client.model.Board;
-import com.ivantodor.snake.arena.client.view.*;
 import com.ivantodor.snake.arena.client.model.Snake;
+import com.ivantodor.snake.arena.client.view.*;
 import com.ivantodor.snake.arena.client.websocket.WebsocketClient;
 import com.ivantodor.snake.arena.client.websocket.WebsocketClientException;
 import com.ivantodor.snake.arena.common.MoveAction;
@@ -20,6 +20,8 @@ import org.slf4j.LoggerFactory;
 import javax.websocket.MessageHandler;
 import java.awt.*;
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
+import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -65,11 +67,17 @@ public class GameManager implements MessageHandler.Whole<String>
             username = name;
             try
             {
-                websocketClient.connect(host + name);
+                String encodedName = URLEncoder.encode(name, "UTF-8");
+                websocketClient.connect(host + encodedName);
             }
             catch (WebsocketClientException e)
             {
-                logger.error("Connecting to game server failed");
+                logger.error("Connecting to game server failed", e);
+                Platform.runLater(() -> connectionView.setConnected(false));
+            }
+            catch (UnsupportedEncodingException e)
+            {
+                logger.error("Unsupported encoding exception", e);
                 Platform.runLater(() -> connectionView.setConnected(false));
             }
         }
