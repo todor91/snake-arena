@@ -4,10 +4,7 @@ import com.ivantodor.snake.arena.common.MoveAction
 import com.ivantodor.snake.arena.common.model.MatchState
 import com.ivantodor.snake.arena.common.response.MatchDiscoverResponse
 import com.ivantodor.snake.arena.common.response.MatchStatusResponse
-import com.ivantodor.snake.arena.server.gamelogic.Match
-import com.ivantodor.snake.arena.server.gamelogic.MatrixBoard
-import com.ivantodor.snake.arena.server.gamelogic.MaxLengthRules
-import com.ivantodor.snake.arena.server.gamelogic.RandomParallelSpawner
+import com.ivantodor.snake.arena.server.gamelogic.*
 import com.ivantodor.snake.arena.server.helper.onFailure
 import com.ivantodor.snake.arena.server.helper.onSuccess
 import io.vertx.core.AbstractVerticle
@@ -30,7 +27,8 @@ class MatchVerticle(val matchId: String, val clients: List<String>, matchConstra
 
     override fun start() {
 
-        match.startGame()
+        val startStatus = match.startGame()
+        broadcastMatchStatus(startStatus)
 
         periodicUpdateAndReport()
 
@@ -57,24 +55,28 @@ class MatchVerticle(val matchId: String, val clients: List<String>, matchConstra
                 MatchState.ACTIVE -> {
                     val status = match.executeStep()
 
-                    val validSnakes = status.activeSnakes.map { Pair(it.key, it.value.pointList) }.toMap()
-                    val invalidSnakes = status.currentlyInvalid.map { Pair(it.key, it.value.pointList) }.toMap()
-
-                    val statusReport = MatchStatusResponse(matchId, board.size, status.food,
-                            validSnakes + invalidSnakes, match.playerScores, match.state)
-
-                    // all clients including spectators and clients
-                    val allDestinationClients = clients
-
-                    val statusReportJson = JsonObject(Json.encode(statusReport))
-
-                    allDestinationClients.forEach {
-                        vertx.eventBus().send(Address.Client.clientHanlder(it), statusReportJson)
-                    }
+                    broadcastMatchStatus(status)
                 }
                 MatchState.DRAW -> match.startGame()
                 else -> undeployVerticle()
             }
+        }
+    }
+
+    private fun broadcastMatchStatus(matchStatus: MatchStatus) {
+        val validSnakes = matchStatus.activeSnakes.map { Pair(it.key, it.value.pointList) }.toMap()
+        val invalidSnakes = matchStatus.currentlyInvalid.map { Pair(it.key, it.value.pointList) }.toMap()
+
+        val statusReport = MatchStatusResponse(matchId, board.size, matchStatus.food,
+                validSnakes + invalidSnakes, match.playerScores, match.state)
+
+        // all clients including spectators and clients
+        val allDestinationClients = clients
+
+        val statusReportJson = JsonObject(Json.encode(statusReport))
+
+        allDestinationClients.forEach {
+            vertx.eventBus().send(Address.Client.clientHanlder(it), statusReportJson)
         }
     }
 
