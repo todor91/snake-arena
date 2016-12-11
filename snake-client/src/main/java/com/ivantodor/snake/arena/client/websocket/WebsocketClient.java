@@ -63,6 +63,9 @@ public class WebsocketClient extends Endpoint
 
     public void disconnect()
     {
+        if(session == null)
+            return;
+
         try
         {
             session.close();
