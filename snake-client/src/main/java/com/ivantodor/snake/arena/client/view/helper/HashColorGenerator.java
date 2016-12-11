@@ -10,14 +10,7 @@ public class HashColorGenerator implements ColorGenerator
     @Override
     public String getHexColor(String value)
     {
-        StringBuilder finalString = new StringBuilder(value);
-        if(value.length() < 3)
-        {
-            finalString.append(finalString.toString());
-            finalString.append(finalString.toString());
-            finalString.append(finalString.toString());
-        }
-        return String.format("#%X", finalString.toString().hashCode());
+        return String.format("#%X", value.hashCode() + 4096);
     }
 
     @Override

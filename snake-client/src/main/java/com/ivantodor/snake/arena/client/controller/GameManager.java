@@ -2,13 +2,9 @@ package com.ivantodor.snake.arena.client.controller;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.ivantodor.snake.arena.client.model.Board;
-import com.ivantodor.snake.arena.client.model.Snake;
 import com.ivantodor.snake.arena.client.view.*;
 import com.ivantodor.snake.arena.client.websocket.WebsocketClient;
 import com.ivantodor.snake.arena.client.websocket.WebsocketClientException;
-import com.ivantodor.snake.arena.common.MoveAction;
-import com.ivantodor.snake.arena.common.model.Direction;
 import com.ivantodor.snake.arena.common.model.MatchConstraints;
 import com.ivantodor.snake.arena.common.request.MatchDiscoverRequest;
 import com.ivantodor.snake.arena.common.request.MatchInvitationRequest;
@@ -19,13 +15,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.websocket.MessageHandler;
-import java.awt.*;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.stream.Collectors;
 
 import static com.ivantodor.snake.arena.client.helper.JsonMapper.mapper;
@@ -44,11 +38,12 @@ public class GameManager implements MessageHandler.Whole<String>
     private StatusView statusView;
 
     private String username;
-    private SnakeAI snakeAI;
 
     private WebsocketClient websocketClient;
     private static GameManager instance = new GameManager();
 
+    private LinkedBlockingQueue<MatchStatusResponse> responsesQueue;
+    private SnakeAIThread snakeAIThread;
 
     public static GameManager getInstance()
     {
@@ -59,6 +54,11 @@ public class GameManager implements MessageHandler.Whole<String>
     {
         websocketClient = new WebsocketClient();
         websocketClient.setMessageHandler(this);
+        responsesQueue = new LinkedBlockingQueue<>(512);
+
+        snakeAIThread = new SnakeAIThread(responsesQueue, websocketClient);
+        snakeAIThread.setDaemon(false);
+        snakeAIThread.start();
     }
 
     public void connectToGameServer(String host, String name)
@@ -82,6 +82,14 @@ public class GameManager implements MessageHandler.Whole<String>
                 Platform.runLater(() -> connectionView.setConnected(false));
             }
         }
+    }
+
+    public void shutdown()
+    {
+        snakeAIThread.shutdown();
+        if(snakeAIThread.getState() == Thread.State.BLOCKED || snakeAIThread.getState() == Thread.State.WAITING)
+            snakeAIThread.interrupt(); // If thread is blocked
+        websocketClient.disconnect();
     }
 
     public void disconnectFromGameServer()
@@ -131,7 +139,6 @@ public class GameManager implements MessageHandler.Whole<String>
         if(json != null)
         {
             String type = json.get("type").textValue();
-            logger.debug("Processing type = " + type);
 
             switch(type)
             {
@@ -166,29 +173,14 @@ public class GameManager implements MessageHandler.Whole<String>
                         Platform.runLater(() -> gameView.processMatchStatus(matchStatusResponse));
                         Platform.runLater(() -> statusView.updateStatusView(matchStatusResponse.getMatchId(), matchStatusResponse.getMatchState(), matchStatusResponse.getScores()));
 
-                        List<Point> snakePoints = matchStatusResponse.getSnakes().get(username);
-                        Snake playerSnake = new Snake(snakePoints);
-                        List<Snake> enemySnakes = new ArrayList<>();
-
-                        for (Map.Entry<String, List<Point>> entry : matchStatusResponse.getSnakes().entrySet())
-                            if(!entry.getKey().equals(username))
-                                enemySnakes.add(new Snake(entry.getValue()));
-
-                        Board board = new Board(matchStatusResponse.getSize(), playerSnake, enemySnakes, matchStatusResponse.getFoodPosition());
-
-                        Direction action = snakeAI.move(board);
-
-
-                        MoveAction request = new MoveAction(matchStatusResponse.getMatchId(), action);
+                        //Adding status to the AI thread
                         try
                         {
-                            String message = mapper.writeValueAsString(request);
-                            websocketClient.sendMessage(message);
+                            responsesQueue.put(matchStatusResponse);
                         }
-                        catch (JsonProcessingException e)
+                        catch (InterruptedException e)
                         {
-                            logger.error("Could not send move Action");
-                            e.printStackTrace();
+                            logger.error("Could not add MatchStatusResponse to the queue", e);
                         }
 
                     }
@@ -227,9 +219,14 @@ public class GameManager implements MessageHandler.Whole<String>
         this.statusView = statusView;
     }
 
+    public String getUsername()
+    {
+        return username;
+    }
+
     public void setAI(SnakeAI snakeAI)
     {
-        this.snakeAI = snakeAI;
+        this.snakeAIThread.setSnakeAI(snakeAI);
     }
 
     private <T> String convertToJson(T object)

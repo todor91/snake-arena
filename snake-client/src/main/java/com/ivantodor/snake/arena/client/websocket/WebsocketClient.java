@@ -14,6 +14,8 @@ public class WebsocketClient extends Endpoint
     private Logger logger = LoggerFactory.getLogger(getClass().getName());
     private MessageHandler messageHandler;
     private Session session; // thread safe
+    //Each web socket session uses no more than one thread at a time to call its MessageHandlers. !!
+
 
     public void connect(String remoteHost) throws WebsocketClientException
     {
@@ -68,15 +70,12 @@ public class WebsocketClient extends Endpoint
         }
         catch (IOException e)
         {
-            e.printStackTrace();
+            logger.error("Error during websocket closing", e);
         }
     }
 
     public boolean isOpen()
     {
-        if(session == null)
-            return false;
-
-        return session.isOpen();
+        return session != null && session.isOpen();
     }
 }

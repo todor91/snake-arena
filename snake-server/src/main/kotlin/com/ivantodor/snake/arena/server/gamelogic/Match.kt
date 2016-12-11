@@ -28,15 +28,16 @@ class Match(private val players: List<String>, val board: Board, val rules: Rule
     // Accumulated scores calculated from each step
     val playerScores: MutableMap<String, Int> = mutableMapOf()
 
-    fun startGame(): MatchStatus {
-        if(state in listOf(MatchState.INIT, MatchState.DRAW) == false)
-            throw MatchException("Could not start Match - Not in 'INIT' state = $state")
-
+    fun resetMatch(): Unit {
         initMatchInternals()
         spawner.spawnSnakes(board, players)
 
+        state = MatchState.INIT
+        step = 0
+    }
+
+    fun startMatch(): MatchStatus {
         state = MatchState.ACTIVE
-        step++
 
         return getMatchStatus()
     }
@@ -91,6 +92,7 @@ class Match(private val players: List<String>, val board: Board, val rules: Rule
         players.forEach { player ->
             playerMoves.put(player, Direction.FORWARD)
             playerScores.put(player, 0)
+            lastStepInvalid.clear()
         }
     }
 }

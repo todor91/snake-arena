@@ -8,6 +8,8 @@ import com.ivantodor.snake.arena.common.model.Direction;
 import javafx.application.Application;
 import javafx.scene.Scene;
 import javafx.stage.Stage;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.Random;
 
@@ -16,6 +18,8 @@ import java.util.Random;
  */
 public class Main extends Application
 {
+    private Logger logger = LoggerFactory.getLogger(getClass());
+
     public static void main(String[] args)
     {
         launch(args);
@@ -55,6 +59,21 @@ public class Main extends Application
 
         // Initialize final window
         Scene scene = new Scene(win, 750, 500);
+
+        // Proper application shutdown
+        primaryStage.setOnCloseRequest(event ->
+        {
+            gameManager.shutdown();
+            try
+            {
+                stop();
+            }
+            catch (Exception e)
+            {
+                logger.error("Exception during application shutdown", e);
+            }
+        });
+
         primaryStage.setScene(scene);
         primaryStage.show();
     }
