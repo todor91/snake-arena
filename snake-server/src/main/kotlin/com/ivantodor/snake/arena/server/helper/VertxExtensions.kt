@@ -25,8 +25,8 @@ fun <T> AsyncResult<T>.onSuccess(f: (T) -> Unit): Unit {
     }
 }
 
-fun <T> AsyncResult<T>.onFailure(f: () -> Unit): Unit {
+fun <T> AsyncResult<T>.onFailure(f: (Throwable) -> Unit): Unit {
     if(!succeeded()) {
-        f()
+        f(cause())
     }
 }

@@ -3,6 +3,7 @@ package com.ivantodor.snake.arena.server.verticles
 import com.ivantodor.snake.arena.common.model.MatchConstraints
 import com.ivantodor.snake.arena.common.request.MatchInvitationRequest
 import io.vertx.core.AbstractVerticle
+import io.vertx.core.DeploymentOptions
 import io.vertx.core.json.Json
 import io.vertx.core.json.JsonObject
 import mu.KLogging
@@ -59,7 +60,8 @@ class MatchOrganizerVerticle : AbstractVerticle() {
                 lists.add(pendingInvitations[invitationId]?.initiator ?: "123")
                 lists.addAll(pendingInvitations[invitationId]?.responses?.keys ?: listOf())
 
-                vertx.deployVerticle(MatchVerticle(invitationId, lists, pendingInvitations[invitationId]?.matchConstraints ?: MatchConstraints()))
+                val matchVerticleOptions = DeploymentOptions().setWorker(true)
+                vertx.deployVerticle(MatchVerticle(invitationId, lists, pendingInvitations[invitationId]?.matchConstraints ?: MatchConstraints()), matchVerticleOptions)
                 pendingInvitations.remove(invitationId)
             }
         }

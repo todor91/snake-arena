@@ -18,6 +18,10 @@ object Address {
 
         // Match verticle receives client's move commands on this address
         fun action(matchId: String) = "${AddressPrefix}.${MatchPrefix}.$matchId.ACTION"
+
+        fun spectatorIn(matchId: String) = "${AddressPrefix}.${MatchPrefix}.$matchId.SPECTATOR.IN"
+
+        fun spectatorOut(matchId: String) = "${AddressPrefix}.${MatchPrefix}.$matchId.SPECTATOR.OUT"
     }
 
     object Client {

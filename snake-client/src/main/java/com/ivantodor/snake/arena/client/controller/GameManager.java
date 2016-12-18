@@ -6,9 +6,9 @@ import com.ivantodor.snake.arena.client.view.*;
 import com.ivantodor.snake.arena.client.websocket.WebsocketClient;
 import com.ivantodor.snake.arena.client.websocket.WebsocketClientException;
 import com.ivantodor.snake.arena.common.model.MatchConstraints;
-import com.ivantodor.snake.arena.common.request.MatchDiscoverRequest;
 import com.ivantodor.snake.arena.common.request.MatchInvitationRequest;
 import com.ivantodor.snake.arena.common.request.PlayerListRequest;
+import com.ivantodor.snake.arena.common.request.SpectateRequest;
 import com.ivantodor.snake.arena.common.response.*;
 import javafx.application.Platform;
 import org.slf4j.Logger;
@@ -45,6 +45,8 @@ public class GameManager implements MessageHandler.Whole<String>
     private LinkedBlockingQueue<MatchStatusResponse> responsesQueue;
     private SnakeAIThread snakeAIThread;
 
+    private String spectatingMatchId = "";
+    private String lastInvitationId = null;
     public static GameManager getInstance()
     {
         return instance; // already initialized
@@ -98,13 +100,8 @@ public class GameManager implements MessageHandler.Whole<String>
         {
             websocketClient.disconnect();
             Platform.runLater( () -> connectionView.setConnected(false));
+            Platform.runLater( () -> matchListView.removeAll());
         }
-    }
-
-    public void refreshMatchList()
-    {
-        String discoverRequestJson = convertToJson(new MatchDiscoverRequest());
-        websocketClient.sendMessage(discoverRequestJson);
     }
 
     public void sendInvitationResponse(MatchInvitationResponse response)
@@ -120,6 +117,18 @@ public class GameManager implements MessageHandler.Whole<String>
     public void invitePlayers(List<String> invitedPlayers, MatchConstraints matchConstraints)
     {
         MatchInvitationRequest request = new MatchInvitationRequest(invitedPlayers, matchConstraints);
+        websocketClient.sendMessage(convertToJson(request));
+        lastInvitationId = request.getInvitationId();
+    }
+
+    public void spectateMatch(String matchId)
+    {
+        if(spectatingMatchId.equals(matchId))
+            return;
+
+        this.spectatingMatchId = matchId;
+
+        SpectateRequest request = new SpectateRequest(matchId);
         websocketClient.sendMessage(convertToJson(request));
     }
 
@@ -166,17 +175,37 @@ public class GameManager implements MessageHandler.Whole<String>
                     }
                     break;
 
+                case FinishedMatchResponse.TYPE:
+                    FinishedMatchResponse finishedResponse = parseJson(json, FinishedMatchResponse.class);
+                    if(finishedResponse != null)
+                        Platform.runLater(() -> matchListView.removeMatch(finishedResponse.getMatchId()));
+
+                    break;
+
                 case MatchStatusResponse.TYPE:
                     MatchStatusResponse matchStatusResponse = parseJson(json, MatchStatusResponse.class);
                     if(matchStatusResponse != null)
                     {
-                        Platform.runLater(() -> gameView.processMatchStatus(matchStatusResponse));
-                        Platform.runLater(() -> statusView.updateStatusView(matchStatusResponse.getMatchId(), matchStatusResponse.getMatchState(), matchStatusResponse.getScores()));
+                        // If we sent the request, we want to switch to spectate that game when response arrives
+                        if(lastInvitationId != null && matchStatusResponse.getMatchId().equals(lastInvitationId))
+                        {
+                            spectateMatch(lastInvitationId);
+                            lastInvitationId = null;
+                        }
+
+                        if(spectatingMatchId.equals(matchStatusResponse.getMatchId()))
+                        {
+                            Platform.runLater(() -> gameView.processMatchStatus(matchStatusResponse));
+                            Platform.runLater(() -> statusView.updateStatusView(matchStatusResponse.getMatchId(), matchStatusResponse.getMatchState(), matchStatusResponse.getScores()));
+                        }
 
                         //Adding status to the AI thread
                         try
                         {
-                            responsesQueue.put(matchStatusResponse);
+                            // If user's snake is on the board, only then request action from the AI
+                            if(matchStatusResponse.getSnakes().containsKey(username))
+                                responsesQueue.put(matchStatusResponse);
+
                         }
                         catch (InterruptedException e)
                         {

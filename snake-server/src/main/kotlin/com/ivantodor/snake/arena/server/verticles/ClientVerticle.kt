@@ -1,9 +1,9 @@
 package com.ivantodor.snake.arena.server.verticles
 
 import com.ivantodor.snake.arena.common.MoveAction
-import com.ivantodor.snake.arena.common.request.MatchDiscoverRequest
 import com.ivantodor.snake.arena.common.request.MatchInvitationRequest
 import com.ivantodor.snake.arena.common.request.PlayerListRequest
+import com.ivantodor.snake.arena.common.request.SpectateRequest
 import com.ivantodor.snake.arena.common.response.MatchInvitationResponse
 import com.ivantodor.snake.arena.common.response.PlayerListResponse
 import com.ivantodor.snake.arena.server.helper.Globals
@@ -23,6 +23,8 @@ import mu.KLogging
 class ClientVerticle(val clientId: String, val websocket: ServerWebSocket) : AbstractVerticle() {
     companion object : KLogging()
 
+    private var currentlySpectatingMatchId: String? = null
+
     override fun start() {
         val clientAddress = Address.Client.clientHanlder(clientId)
 
@@ -35,6 +37,9 @@ class ClientVerticle(val clientId: String, val websocket: ServerWebSocket) : Abs
 
             websocket.writeFinalTextFrame(msg.toString())
         }
+
+        // Just after the client has connected
+        broadcastDiscoverMatchesRequest()
     }
 
     private fun broadcastDiscoverMatchesRequest() {
@@ -69,6 +74,17 @@ class ClientVerticle(val clientId: String, val websocket: ServerWebSocket) : Abs
         vertx.eventBus().send(Address.Match.action(moveAction.matchId), moveActionJson, deliveryOptions)
     }
 
+    private fun startSpectating(spectateRequest: JsonObject) {
+        val matchId = spectateRequest.getString("matchId")
+        val internalJsonRequest = spectateRequest.put("clientId", clientId)
+
+        if(currentlySpectatingMatchId != null)
+            vertx.eventBus().send(Address.Match.spectatorOut(matchId), internalJsonRequest)
+
+        currentlySpectatingMatchId = matchId
+        vertx.eventBus().send(Address.Match.spectatorIn(matchId), internalJsonRequest)
+    }
+
     private fun registerWebsocketCloseHandler() {
         websocket.closeHandler {
             logger.info("Undeploying client verticle for '$clientId'")
@@ -78,7 +94,7 @@ class ClientVerticle(val clientId: String, val websocket: ServerWebSocket) : Abs
                     //todo cluster-wide maps !!!
                     Globals.clientList.remove(clientId)
                 }
-                result.onFailure { logger.error("Failed to undeploy client verticle for '$clientId'") }
+                result.onFailure { logger.error("Failed to undeploy client verticle for '$clientId'", it) }
             }
         }
     }
@@ -92,11 +108,11 @@ class ClientVerticle(val clientId: String, val websocket: ServerWebSocket) : Abs
 
             val messageType = buffer.toJsonObject().getString("type")
             when (messageType) {
-                MatchDiscoverRequest.TYPE -> broadcastDiscoverMatchesRequest()
                 PlayerListRequest.TYPE -> respondWithPlayerList()
                 MatchInvitationRequest.TYPE -> sendMatchInvitation(buffer.toJsonObject())
                 MatchInvitationResponse.TYPE -> sendMatchInvitationResponse(buffer.toJsonObject())
                 MoveAction.TYPE -> sendClientMoveAction(buffer.toJsonObject())
+                SpectateRequest.TYPE -> startSpectating(buffer.toJsonObject())
                 else -> logger.error("Invalid message type: $messageType")
             }
         }

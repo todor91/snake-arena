@@ -14,8 +14,7 @@ import javafx.scene.layout.VBox;
  */
 public class MatchListPane extends VBox implements MatchListView
 {
-    private Button refreshButton = new Button("Refresh");
-    private Button challengeButton = new Button("Spectate");
+    private Button spectateButton = new Button("Spectate");
 
     private ListView<String> list = new ListView<>();
 
@@ -27,7 +26,7 @@ public class MatchListPane extends VBox implements MatchListView
     private void setupUI()
     {
         HBox buttonPane = new HBox(5);
-        buttonPane.getChildren().addAll(refreshButton, challengeButton);
+        buttonPane.getChildren().addAll(spectateButton);
         buttonPane.setAlignment(Pos.CENTER);
         buttonPane.setPrefHeight(50);
 
@@ -35,7 +34,8 @@ public class MatchListPane extends VBox implements MatchListView
         this.setPrefWidth(180);
 
         list.prefHeightProperty().bind(heightProperty().subtract(50));
-        refreshButton.setOnAction(e -> refreshMatchList());
+
+        spectateButton.setOnAction(action -> spectateMatch());
     }
 
     public void addMatch(String match)
@@ -45,9 +45,24 @@ public class MatchListPane extends VBox implements MatchListView
         list.setItems(items);
     }
 
-    private void refreshMatchList()
+    public void removeAll()
     {
         list.getItems().clear();
-        GameManager.getInstance().refreshMatchList();
+    }
+
+    public void removeMatch(String matchId)
+    {
+        ObservableList<String> items = list.getItems();
+        items.remove(matchId);
+        list.setItems(items);
+    }
+
+    private void spectateMatch()
+    {
+        String matchId = list.getSelectionModel().getSelectedItem();
+        if(matchId != null)
+        {
+            GameManager.getInstance().spectateMatch(matchId);
+        }
     }
 }

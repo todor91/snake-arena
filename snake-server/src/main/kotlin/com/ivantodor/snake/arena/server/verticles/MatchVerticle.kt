@@ -3,9 +3,11 @@ package com.ivantodor.snake.arena.server.verticles
 import com.ivantodor.snake.arena.common.MoveAction
 import com.ivantodor.snake.arena.common.model.MatchConstraints
 import com.ivantodor.snake.arena.common.model.MatchState
+import com.ivantodor.snake.arena.common.response.FinishedMatchResponse
 import com.ivantodor.snake.arena.common.response.MatchDiscoverResponse
 import com.ivantodor.snake.arena.common.response.MatchStatusResponse
 import com.ivantodor.snake.arena.server.gamelogic.*
+import com.ivantodor.snake.arena.server.helper.Globals
 import com.ivantodor.snake.arena.server.helper.onFailure
 import com.ivantodor.snake.arena.server.helper.onSuccess
 import io.vertx.core.AbstractVerticle
@@ -28,6 +30,9 @@ class MatchVerticle(val matchId: String, val clients: List<String>, val matchCon
     private var timerId: Long = 0
     private val preemptiveExecutionTimer: Long = Math.min(200, matchConstraints.stepTimeout.toLong())
 
+    // List of all spectators that should also receive match responses
+    private val spectators: MutableSet<String> = mutableSetOf()
+
     override fun start() {
         // Reset the board, and place the snakes
         match.resetMatch()
@@ -40,6 +45,15 @@ class MatchVerticle(val matchId: String, val clients: List<String>, val matchCon
 
         // Process match discovery message
         registerMatchDiscoveryListener()
+
+        registerSpectatorManagementListener()
+
+        val discover = MatchDiscoverResponse(matchId, clients)
+        val matchDiscoverResponse = JsonObject(Json.encode(discover))
+        Globals.clientList.forEach { client ->
+            vertx.eventBus().send(Address.Client.clientHanlder(client), matchDiscoverResponse)
+        }
+
     }
 
     private fun timedUpdateAndReport() {
@@ -47,23 +61,27 @@ class MatchVerticle(val matchId: String, val clients: List<String>, val matchCon
             MatchState.INIT -> {
                 val startingStatus = match.startMatch()
                 broadcastMatchStatus(startingStatus)
+                resetMatchTimer { timedUpdateAndReport() }
             }
 
             MatchState.ACTIVE -> {
                 val status = match.executeStep()
+                clientResponses.clear()
                 broadcastMatchStatus(status)
+                resetMatchTimer { timedUpdateAndReport() }
             }
 
             MatchState.DRAW -> {
                 match.resetMatch()
                 clientResponses.clear()
+                resetMatchTimer { timedUpdateAndReport() }
             }
 
-            else -> undeployVerticle()
+            MatchState.DONE -> {
+                broadcastFinishedMatchResponseToAll()
+                undeployVerticle()
+            }
         }
-
-        if(match.state != MatchState.DONE)
-            withMatchTimer { timedUpdateAndReport() }
     }
 
     private fun registerMoveActionListener() {
@@ -82,7 +100,7 @@ class MatchVerticle(val matchId: String, val clients: List<String>, val matchCon
                     clientResponses.clear()
 
                     // todo take care of situation when moveActions came just before the "main loop" timer event
-                    vertx.setTimer(preemptiveExecutionTimer) {
+                    timerId = vertx.setTimer(preemptiveExecutionTimer) {
                         timedUpdateAndReport()
                     }
                 }
@@ -99,11 +117,27 @@ class MatchVerticle(val matchId: String, val clients: List<String>, val matchCon
         }
     }
 
+    private fun registerSpectatorManagementListener() {
+        vertx.eventBus().consumer<JsonObject>(Address.Match.spectatorIn(matchId)) { msg ->
+            val jsonObject = msg.body()
+            val clientId = jsonObject.getString("clientId")
+
+            spectators.add(clientId)
+        }
+
+        vertx.eventBus().consumer<JsonObject>(Address.Match.spectatorOut(matchId)) { msg ->
+            val jsonObject = msg.body()
+            val clientId = jsonObject.getString("clientId")
+
+            spectators.remove(clientId)
+        }
+    }
+
     private fun undeployVerticle() {
         logger.info("Undeploying match verticle '$matchId'")
         vertx.undeploy(deploymentID()) { result ->
             result.onSuccess { logger.info("Undeployment successful for match '$matchId'") }
-            result.onFailure { logger.error("Failed to undeploy match verticle for '$matchId'") }
+            result.onFailure { logger.error("Failed to undeploy match verticle for '$matchId'", it) }
         }
     }
 
@@ -115,7 +149,7 @@ class MatchVerticle(val matchId: String, val clients: List<String>, val matchCon
                 validSnakes + invalidSnakes, match.playerScores, match.state)
 
         // all clients including spectators and clients
-        val allDestinationClients = clients
+        val allDestinationClients = clients + spectators
 
         val statusReportJson = JsonObject(Json.encode(statusReport))
 
@@ -124,7 +158,17 @@ class MatchVerticle(val matchId: String, val clients: List<String>, val matchCon
         }
     }
 
-    private fun withMatchTimer(f: () -> Unit) {
+    private fun broadcastFinishedMatchResponseToAll() {
+        val allDestinationClients = Globals.clientList
+        val finishedMatchResponse = JsonObject(Json.encode(FinishedMatchResponse(matchId)))
+
+        allDestinationClients.forEach {
+            vertx.eventBus().send(Address.Client.clientHanlder(it), finishedMatchResponse)
+        }
+    }
+
+    private fun resetMatchTimer(f: () -> Unit) {
+        vertx.cancelTimer(timerId)
         timerId = vertx.setTimer(matchConstraints.stepTimeout.toLong()) {
             f()
         }
