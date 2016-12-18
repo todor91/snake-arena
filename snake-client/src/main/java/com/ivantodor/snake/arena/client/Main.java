@@ -58,7 +58,7 @@ public class Main extends Application
 
 
         // Initialize final window
-        Scene scene = new Scene(win, 750, 500);
+        Scene scene = new Scene(win, 760, 510);
 
         // Proper application shutdown
         primaryStage.setOnCloseRequest(event ->

@@ -3,7 +3,7 @@ package com.ivantodor.snake.arena.client.view.impl;
 import com.ivantodor.snake.arena.client.view.GameView;
 import com.ivantodor.snake.arena.client.view.helper.CanvasPane;
 import com.ivantodor.snake.arena.client.view.helper.ColorGenerator;
-import com.ivantodor.snake.arena.client.view.helper.HashColorGenerator;
+import com.ivantodor.snake.arena.client.view.helper.PoolColorGenerator;
 import com.ivantodor.snake.arena.common.response.MatchStatusResponse;
 import javafx.geometry.Point2D;
 import javafx.scene.canvas.GraphicsContext;
@@ -31,7 +31,7 @@ public class GamePane extends BorderPane implements GameView
 
     private Map<String, List<Point>> snakes = new HashMap<>();
 
-    private ColorGenerator colorGenerator = new HashColorGenerator();
+    private ColorGenerator colorGenerator = new PoolColorGenerator();
     @Override
     public void resize(double width, double height)
     {
@@ -82,13 +82,14 @@ public class GamePane extends BorderPane implements GameView
             }
     }
 
-    private void drawSnake(GraphicsContext gc, List<Point2D> points, Color color)
+    private void drawSnakeShape(GraphicsContext gc, List<Point2D> points, Color color, int headSize, int bodySize)
     {
         gc.setStroke(color);
-        gc.setLineWidth(6);
+        gc.setLineWidth(bodySize);
         gc.setFill(color);
+
         Point2D prev = translatePoint(points.get(0));
-        gc.fillOval(prev.getX()- 10, prev.getY() - 10, 20, 20);
+        gc.fillOval(prev.getX() - headSize / 2, prev.getY() - headSize / 2, headSize, headSize);
 
         for (int i = 1; i < points.size(); i++)
         {
@@ -109,7 +110,11 @@ public class GamePane extends BorderPane implements GameView
             }
 
             Color snakeColor = colorGenerator.getColor(entry.getKey());
-            drawSnake(gc, value, snakeColor);
+
+            // Draw shape outline
+            drawSnakeShape(gc, value, Color.BLACK, 22, 8);
+            // Draw snake's inner area
+            drawSnakeShape(gc, value, snakeColor, 20, 6);
         }
     }
 

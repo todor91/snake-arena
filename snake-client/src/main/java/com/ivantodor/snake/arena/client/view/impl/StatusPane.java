@@ -2,7 +2,7 @@ package com.ivantodor.snake.arena.client.view.impl;
 
 import com.ivantodor.snake.arena.client.view.StatusView;
 import com.ivantodor.snake.arena.client.view.helper.ColorGenerator;
-import com.ivantodor.snake.arena.client.view.helper.HashColorGenerator;
+import com.ivantodor.snake.arena.client.view.helper.PoolColorGenerator;
 import com.ivantodor.snake.arena.common.model.MatchState;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -18,7 +18,7 @@ import java.util.Map;
  */
 public class StatusPane extends BorderPane implements StatusView
 {
-    private ColorGenerator colorGenerator = new HashColorGenerator();
+    private ColorGenerator colorGenerator = new PoolColorGenerator();
 
     private FlowPane scoresPane = new FlowPane();
     private Label matchIdLabel = new Label("----");
